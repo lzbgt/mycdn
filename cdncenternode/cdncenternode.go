@@ -181,11 +181,32 @@ func main() {
 		ret += "mapUidToMNMap:\n"
 		for k, v := range mapUidToMNMap {
 			for m, n := range v {
-				ret += "\t" + "k: " + k + " m:" + m + " ,n:" + n.Ip
+				ret += "\t" + "k: " + k + " m:" + m + " ,n:" + n.Ip + "\n"
 			}
 		}
-
 		c.String(http.StatusOK, ret)
+	})
+
+	router.GET("/del", func(c *gin.Context) {
+		obj := c.Query("obj")
+		key1 := c.Query("key1")
+		key2 := c.Query("key2")
+
+		if obj == "vname" && key1 != "" {
+			delete(mapVNameToSourceName, key1)
+		} else if obj == "node" && key1 != "" {
+			if key2 == "" && len(mapUidToMNMap[key1]) == 0 {
+				delete(mapUidToMNMap, key1)
+			} else if key2 != "" {
+				delete(mapUidToMNMap[key1], key2)
+			}
+		} else {
+			c.String(http.StatusOK, "usage: /del?obj=<vname|node>&key1=<>&key2=<>")
+			return
+		}
+
+		c.String(http.StatusOK, "done")
+
 	})
 
 	router.Run(":" + strconv.Itoa(env.ApiPort))
