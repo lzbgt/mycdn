@@ -52,7 +52,6 @@ func init() {
 
 	var err error
 	dir := os.Args[0] + "_DB"
-	os.MkdirAll(dir+"_DB", 0777)
 	db, err = leveldb.OpenFile(dir, nil)
 	if err != nil {
 		panic(err)
