@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"log"
 	"net"
 	"net/http"
 	"net/url"
@@ -14,6 +13,7 @@ import (
 	"syscall"
 	"toolbox"
 
+	log "github.com/Sirupsen/logrus"
 	"github.com/gin-gonic/gin"
 	"github.com/hprose/hprose-go"
 	"github.com/syndtr/goleveldb/leveldb"
@@ -42,10 +42,11 @@ func (DService) GetFastNodes(uid, clientIP string) []string {
 
 //
 type EnvStruct struct {
-	WebPort int
-	RPCPort int
-	HostIP  string
-	DBPath  string
+	WebPort  int
+	RPCPort  int
+	HostIP   string
+	DBPath   string
+	LogLevel string
 }
 
 type DBReader struct {
@@ -89,17 +90,34 @@ var env EnvStruct
 var db *leveldb.DB
 
 func init() {
+	log.SetOutput(os.Stderr)
+	var logLevels []string = make([]string, 0, 10)
+	logLevels = append(logLevels, log.DebugLevel.String())
+	logLevels = append(logLevels, log.InfoLevel.String())
+	logLevels = append(logLevels, log.WarnLevel.String())
+	logLevels = append(logLevels, log.ErrorLevel.String())
+	logLevels = append(logLevels, log.FatalLevel.String())
+	logLevels = append(logLevels, log.PanicLevel.String())
+
 	flag.IntVar(&env.RPCPort, "rpc", 2048, "rpc port")
 	flag.IntVar(&env.WebPort, "web", 80, "web port")
 	flag.StringVar(&env.HostIP, "host", "127.0.0.1", "host IP")
 	flag.StringVar(&env.DBPath, "db", "", "db path")
+	flag.StringVar(&env.LogLevel, "log", log.DebugLevel.String(), "log level: "+strings.Join(logLevels, ","))
+
 	flag.Parse()
+	lvl, err := log.ParseLevel(env.LogLevel)
+	if nil == err {
+		log.SetLevel(lvl)
+	} else {
+		log.SetLevel(log.DebugLevel)
+		log.Warn("invalid log level, use default")
+	}
 
 	if env.DBPath == "" {
 		env.DBPath = filepath.Dir(os.Args[0]) + "/DB"
 	}
 	os.MkdirAll(env.DBPath, 0777)
-	var err error
 	db, err = leveldb.OpenFile(env.DBPath, nil)
 	if err != nil {
 		panic(err)
@@ -138,7 +156,7 @@ func main() {
 			params.Add("bid", "_OSYOudPLq5m7Z3S_RcB-QS5Uq3dEwOm7hY9VFSXvoo")
 			params.Add("source", "http://121.43.154.122:8866/getres?bid=_OSYOudPLq5m7Z3S_RcB-QS5Uq3dEwOm7hY9VFSXvoo&key=K5_T84l1VQ6gl_Q298TK3kAeBDH5Gn_zsiTAlHQzsaE")
 			Url.RawQuery = params.Encode()
-			log.Printf("INFO url is %q", Url.String())
+			log.Infof("url is %q", Url.String())
 			c.String(http.StatusOK, "%s", Url.String())
 		} else {
 			newUrl := utils.GetParamsSortedUrl(source)
@@ -150,7 +168,7 @@ func main() {
 			// check cache
 			ret, err := db.Get([]byte(newUrl), nil)
 			if nil != err {
-				log.Printf("ERR get key failed: %v, %v", newUrl, err)
+				log.Errorf("get key failed: %v, %v", newUrl, err)
 				go utils.CacheRes(newUrl, db, nil)
 				c.Redirect(http.StatusTemporaryRedirect, source)
 			} else {
@@ -162,15 +180,17 @@ func main() {
 				} else {
 					wr := utils.DBEntry{}
 					if err := utils.GetInterface(ret, &wr); nil != err {
-						log.Printf("ERR failed process cached content %v, %v", err, source)
+						log.Errorf("failed process cached content %v, %v", err, source)
 						c.Redirect(http.StatusTemporaryRedirect, source)
 					} else {
-						for k, v := range wr["header"].(http.Header) {
+						header := wr["header"].(http.Header)
+						for k, v := range header {
 							c.Writer.Header().Set(k, strings.Join(v, ""))
 						}
+
 						c.Writer.Header().Del("Date")
 						c.Writer.Write(wr["body"].([]byte))
-						log.Printf("INFO success response with cache %#v", newUrl)
+						log.Infof("success response with cache, len: %v, url: %v", header["Content-Length"], newUrl)
 					}
 				}
 			}
