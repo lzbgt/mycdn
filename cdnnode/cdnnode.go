@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"mycdn/toolbox"
 	"net"
 	"net/http"
 	"net/url"
@@ -11,7 +12,6 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
-	"toolbox"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/gin-gonic/gin"
@@ -42,10 +42,12 @@ func (DService) GetFastNodes(uid, clientIP string) []string {
 
 //
 type EnvStruct struct {
-	WebPort  int
-	RPCPort  int
-	HostIP   string
-	DBPath   string
+	WebPort int
+	RPCPort int
+	HostIP  string
+	DBPath  string
+	// center node addr: ip or name
+	CtrlAddr string
 	LogLevel string
 }
 
@@ -104,6 +106,7 @@ func init() {
 	flag.StringVar(&env.HostIP, "host", "127.0.0.1", "host IP")
 	flag.StringVar(&env.DBPath, "db", "", "db path")
 	flag.StringVar(&env.LogLevel, "log", log.DebugLevel.String(), "log level: "+strings.Join(logLevels, ","))
+	flag.StringVar(&env.CtrlAddr, "ctrlUrl", "ctrl.cdn.leither.cn:81", "center node addr")
 
 	flag.Parse()
 	lvl, err := log.ParseLevel(env.LogLevel)
@@ -138,12 +141,22 @@ func main() {
 		syscall.Exit(0)
 	}()
 
+	// add itself to ctrl node
+
 	service := hprose.NewHttpService()
 	service.AddMethods(DService{})
 	go http.ListenAndServe(":"+strconv.Itoa(env.RPCPort), service)
 
 	// web server
 	router := gin.Default()
+	router.HEAD("/alive", func(c *gin.Context) {
+		c.String(http.StatusOK, "Yes")
+	})
+
+	router.GET("/alive", func(c *gin.Context) {
+		c.String(http.StatusOK, "Yes")
+	})
+
 	router.GET("/getres", func(c *gin.Context) {
 		uid := c.Query("bid")
 		source := c.Query("source") // shortcut for c.Request.URL.Query().Get("lastname")
@@ -197,4 +210,12 @@ func main() {
 		}
 	})
 	router.Run(":" + strconv.Itoa(env.WebPort))
+}
+
+func AddToCtrlNode(ctrlAddr string) {
+	if _, err := http.Get("http://" + env.CtrlAddr + "/addmn?ips=" + env.HostIP); nil != err {
+		log.Error("Failed connect to center node: ", env.CtrlAddr, err)
+	} else {
+		log.Info("Success registered to center node", env.CtrlAddr)
+	}
 }
