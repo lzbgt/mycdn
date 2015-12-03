@@ -106,6 +106,8 @@ func init() {
 
 	mapLBRing = BuildLBRingFromUidMap()
 	mapLBRingFailed = make(map[string]*utils.LBRing)
+
+	RefreshLBRing()
 }
 
 //

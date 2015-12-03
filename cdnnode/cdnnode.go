@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/gin-gonic/gin"
@@ -106,7 +107,7 @@ func init() {
 	flag.StringVar(&env.HostIP, "host", "127.0.0.1", "host IP")
 	flag.StringVar(&env.DBPath, "db", "", "db path")
 	flag.StringVar(&env.LogLevel, "log", log.DebugLevel.String(), "log level: "+strings.Join(logLevels, ","))
-	flag.StringVar(&env.CtrlAddr, "ctrlUrl", "ctrl.cdn.leither.cn:81", "center node addr")
+	flag.StringVar(&env.CtrlAddr, "center", "ctrl.cdn.leither.cn:81", "center node addr")
 
 	flag.Parse()
 	lvl, err := log.ParseLevel(env.LogLevel)
@@ -125,6 +126,18 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
+
+	// register to ctrl.cdn.leither.cn every 1 minute untill success
+	if AddToCtrlNode(env.CtrlAddr) == false {
+		ticker := time.NewTicker(time.Second * 60 * 1)
+		go func() {
+			for _ = range ticker.C {
+				{
+					return
+				}
+			}
+		}()
+	}
 }
 
 func main() {
@@ -138,6 +151,7 @@ func main() {
 	go func() {
 		<-sigc
 		db.Close()
+		Offline()
 		syscall.Exit(0)
 	}()
 
@@ -212,10 +226,20 @@ func main() {
 	router.Run(":" + strconv.Itoa(env.WebPort))
 }
 
-func AddToCtrlNode(ctrlAddr string) {
+func AddToCtrlNode(ctrlAddr string) bool {
 	if _, err := http.Get("http://" + env.CtrlAddr + "/addmn?ips=" + env.HostIP); nil != err {
 		log.Error("Failed connect to center node: ", env.CtrlAddr, err)
+		return false
 	} else {
-		log.Info("Success registered to center node", env.CtrlAddr)
+		log.Info("Success registered to center node ", env.CtrlAddr)
+		return true
+	}
+}
+
+func Offline() {
+	if _, err := http.Get("http://" + env.CtrlAddr + "/offline?host=" + env.HostIP); nil != err {
+		log.Error("Failed connect to center node: ", env.CtrlAddr, err)
+	} else {
+		log.Info("Success offline from center node ", env.CtrlAddr)
 	}
 }

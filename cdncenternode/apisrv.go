@@ -37,6 +37,14 @@ func startApiSrv() {
 		saveNodeInfo()
 	})
 
+	router.GET("/offline", func(c *gin.Context) {
+		host := c.Query("host")
+		if host != "" {
+			Offline(host)
+		}
+		c.String(http.StatusOK, "done")
+	})
+
 	router.GET("/bind", func(c *gin.Context) {
 		name := c.Query("name")
 		source := c.Query("source")
@@ -53,17 +61,6 @@ func startApiSrv() {
 	})
 
 	router.GET("/dump", func(c *gin.Context) {
-		//		ret := "mapVNameToSourceName:\n"
-		//		for k, v := range mapVNameToSourceName {
-		//			ret += "\tkey: " + k + ", v: " + v + "\n"
-		//		}
-
-		//		ret += "mapUidToMNMap:\n"
-		//		for k, v := range mapUidToMNMap {
-		//			for m, n := range v {
-		//				ret += "\t" + "k: " + k + " m:" + m + " ,n:" + n.Ip + "\n"
-		//			}
-		//		}
 		ret := map[string]interface{}{
 			"ip2mn":      mapIPToMN,
 			"uid2mn":     mapUidToMNMap,
@@ -115,12 +112,38 @@ func NewMassiveNode(uid, ip string) (mn *MassiveNode) {
 				mapLBRing[uid] = &utils.LBRing{}
 			}
 			mapLBRing[uid].Add(mn)
+			if v, ok := mapLBRingFailed[uid]; ok && v != nil {
+				v.Remove(mn)
+			}
+			log.Info("massive node requests to go online ", mn.Ip)
 		}
 
 		mapUidToMNMap[uid][ip] = mn
 	}
 
 	return mn
+}
+
+//
+func Offline(hostIp string) {
+BRK:
+	for k, v := range mapLBRing {
+		if v == nil || v.List == nil {
+			continue
+		}
+		for h := v.List.Front(); h != nil; h = h.Next() {
+			mn := h.Value.(*MassiveNode)
+			if mn.Ip == hostIp {
+				v.Remove(mn)
+				if _, ok := mapLBRingFailed[k]; !ok {
+					mapLBRingFailed[k] = &utils.LBRing{}
+				}
+				mapLBRingFailed[k].Add(mn)
+				log.Info("massive node requests to go offline ", mn.Ip)
+				break BRK
+			}
+		}
+	}
 }
 
 //
