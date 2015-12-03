@@ -14,6 +14,7 @@ import (
 func startApiSrv() {
 	// api server
 	router := gin.Default()
+
 	router.GET("/addmn", func(c *gin.Context) {
 		name := c.Query("name")
 		ip := c.Query("ip")
@@ -52,18 +53,24 @@ func startApiSrv() {
 	})
 
 	router.GET("/dump", func(c *gin.Context) {
-		ret := "mapVNameToSourceName:\n"
-		for k, v := range mapVNameToSourceName {
-			ret += "\tkey: " + k + ", v: " + v + "\n"
+		//		ret := "mapVNameToSourceName:\n"
+		//		for k, v := range mapVNameToSourceName {
+		//			ret += "\tkey: " + k + ", v: " + v + "\n"
+		//		}
+
+		//		ret += "mapUidToMNMap:\n"
+		//		for k, v := range mapUidToMNMap {
+		//			for m, n := range v {
+		//				ret += "\t" + "k: " + k + " m:" + m + " ,n:" + n.Ip + "\n"
+		//			}
+		//		}
+		ret := map[string]interface{}{
+			"ip2mn":      mapIPToMN,
+			"uid2mn":     mapUidToMNMap,
+			"uid2origin": mapVNameToSourceName,
 		}
 
-		ret += "mapUidToMNMap:\n"
-		for k, v := range mapUidToMNMap {
-			for m, n := range v {
-				ret += "\t" + "k: " + k + " m:" + m + " ,n:" + n.Ip + "\n"
-			}
-		}
-		c.String(http.StatusOK, ret)
+		c.JSON(http.StatusOK, ret)
 	})
 
 	router.GET("/del", func(c *gin.Context) {
@@ -103,7 +110,11 @@ func NewMassiveNode(uid, ip string) (mn *MassiveNode) {
 		}
 
 		if _, ok := mapUidToMNMap[uid][ip]; !ok {
-			mapLBRing[uid].Add(ip)
+
+			if _, ok := mapLBRing[uid]; !ok {
+				mapLBRing[uid] = &utils.LBRing{}
+			}
+			mapLBRing[uid].Add(mn)
 		}
 
 		mapUidToMNMap[uid][ip] = mn
