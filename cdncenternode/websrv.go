@@ -34,6 +34,7 @@ func httphandler(w http.ResponseWriter, r *http.Request) {
 	// refresh
 	if httpReqInfo.Refresh {
 		db.Delete([]byte(httpReqInfo.SortedUrl), nil)
+		log.Info("success deleted key: ", httpReqInfo.SortedUrl)
 	}
 
 	// check cache

@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"io/ioutil"
 	"mycdn/toolbox"
 	"net"
 	"net/http"
@@ -191,8 +190,13 @@ func main() {
 
 			if refresh == "1" || strings.EqualFold(refresh, "true") {
 				db.Delete([]byte(newUrl), nil)
+				log.Info("success deleted key: ", newUrl)
+				go utils.CacheRes(newUrl, db, nil)
+				c.Redirect(http.StatusTemporaryRedirect, source)
+				return
 			}
-			//c.String(http.StatusOK, "%s", newUrl)
+
+			// c.String(http.StatusOK, "%s", newUrl)
 			// check cache
 			ret, err := db.Get([]byte(newUrl), nil)
 			if nil != err {
@@ -228,13 +232,13 @@ func main() {
 }
 
 func AddToCtrlNode(ctrlAddr string) bool {
-	if resp, err := http.Get("http://" + env.CtrlAddr + "/addmn?ip=" + env.HostIP); nil != err {
+	url := "http://" + env.CtrlAddr + "/addmn?ip=" + env.HostIP
+	if resp, err := http.Get(url); nil != err {
 		log.Error("Failed connect to center node: ", env.CtrlAddr, err)
 		return false
 	} else {
-		b, err := ioutil.ReadAll(resp.Body)
-		if strings.Contains(string(b), "Yes") {
-			log.Info("Success registered to center node ", env.CtrlAddr, string(b))
+		if resp.StatusCode == http.StatusOK {
+			log.Info("Success registered to center node ", env.CtrlAddr)
 			return true
 		} else {
 			log.Error("Failed register to center node: ", env.CtrlAddr, err)

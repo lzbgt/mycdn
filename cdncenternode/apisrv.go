@@ -19,7 +19,7 @@ func startApiSrv() {
 		name := c.Query("name")
 		ip := c.Query("ip")
 		if len(ip) == 0 {
-			c.String(http.StatusOK, "ERR no ip provided")
+			c.String(http.StatusBadRequest, "ERR no ip provided")
 			return
 		}
 		ips := strings.Split(ip, ",")
@@ -49,7 +49,7 @@ func startApiSrv() {
 		name := c.Query("name")
 		source := c.Query("source")
 		if len(name) == 0 || len(source) == 0 {
-			c.String(http.StatusOK, "ERR no name/source")
+			c.String(http.StatusBadRequest, "ERR no name/source")
 			return
 		}
 
@@ -84,7 +84,7 @@ func startApiSrv() {
 				delete(mapUidToMNMap[key1], key2)
 			}
 		} else {
-			c.String(http.StatusOK, "usage: /del?obj=<vname|node>&k1=<>&k2=<>")
+			c.String(http.StatusBadRequest, "usage: /del?obj=<vname|node>&k1=<>&k2=<>")
 			return
 		}
 
