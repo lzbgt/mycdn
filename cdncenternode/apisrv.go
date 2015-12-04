@@ -115,7 +115,7 @@ func NewMassiveNode(uid, ip string) (mn *MassiveNode) {
 			if v, ok := mapLBRingFailed[uid]; ok && v != nil {
 				v.Remove(mn)
 			}
-			log.Info("massive node requests to go online ", mn.Ip)
+			log.Info("massive node comes online ", mn.Ip)
 		}
 
 		mapUidToMNMap[uid][ip] = mn
@@ -139,7 +139,7 @@ BRK:
 					mapLBRingFailed[k] = &utils.LBRing{}
 				}
 				mapLBRingFailed[k].Add(mn)
-				log.Info("massive node requests to go offline ", mn.Ip)
+				log.Info("massive node goes offline ", mn.Ip)
 				break BRK
 			}
 		}

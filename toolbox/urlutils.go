@@ -20,7 +20,7 @@ func GetParamsSortedUrl(source string) string {
 
 	keys := make([]string, len(sourceParams))
 	i := 0
-	for k := range sourceParams {
+	for k, _ := range sourceParams {
 		keys[i] = k
 		i++
 	}

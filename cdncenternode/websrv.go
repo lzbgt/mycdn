@@ -10,6 +10,8 @@ import (
 	log "github.com/Sirupsen/logrus"
 )
 
+const REFRESH_PARAMNAME = "_sysrefresh"
+
 func startWebSrv() {
 	http.HandleFunc("/", httphandler)
 	log.Println("INFO start web server on port ", env.WebPort)
@@ -22,11 +24,16 @@ func startWebSrv() {
 
 //
 func httphandler(w http.ResponseWriter, r *http.Request) {
-	log.Infof("clientAddr: %v, Url:%v\n", r.RemoteAddr, r.Host+r.RequestURI)
+	log.Infof("clientAddr: %v, Url:%v", r.RemoteAddr, r.Host+r.RequestURI)
 	httpReqInfo := getHttpReqInfo(w, r)
 
 	if httpReqInfo.SourceAddr == "" {
 		return
+	}
+
+	// refresh
+	if httpReqInfo.Refresh {
+		db.Delete([]byte(httpReqInfo.SortedUrl), nil)
 	}
 
 	// check cache
@@ -96,10 +103,13 @@ func redirectResources(w http.ResponseWriter, r *http.Request, httpReqInfo *CDNH
 		//
 		params := url.Values{}
 		params.Add("bid", httpReqInfo.HostAddr[0])
-		params.Add("source", httpReqInfo.SourceUrl)
+		params.Add("source", httpReqInfo.SortedUrl)
+		if httpReqInfo.Refresh {
+			params.Add("refresh", "1")
+		}
 		Url.RawQuery = params.Encode()
 		http.Redirect(w, r, Url.String(), http.StatusTemporaryRedirect)
-		log.Infof("redirect to massive node: %v, %v", Url.String(), httpReqInfo.SourceUrl)
+		log.Infof("redirect to massive node: %v, %v", Url.String(), httpReqInfo.SortedUrl)
 	}
 }
 
@@ -127,7 +137,7 @@ func getHttpReqInfo(w http.ResponseWriter, r *http.Request) CDNHttpReqInfo {
 	sourceAddr, ok := mapVNameToSourceName[dname[0]]
 	if !ok {
 		ret.SourceAddr = ""
-		log.Errorf("no such dynamic name registered: %v\n", dname)
+		log.Errorf("no such dynamic name registered: %v", dname)
 		w.WriteHeader(http.StatusForbidden)
 		w.Write([]byte("Invalid user of LOSCDN. Please register on http://leither.cn"))
 	} else {
@@ -135,13 +145,30 @@ func getHttpReqInfo(w http.ResponseWriter, r *http.Request) CDNHttpReqInfo {
 		if len(dname) == 2 {
 			sourceAddr += ":" + dname[1]
 		}
+
 		ret.SourceAddr = sourceAddr
+		ret.SourceUrl = "http://" + sourceAddr + r.RequestURI
+		Url, _ := url.Parse(ret.SourceUrl)
+		values := Url.Query()
+		if t := values.Get(REFRESH_PARAMNAME); strings.EqualFold(t, "1") || strings.EqualFold(t, "true") {
+			ret.Refresh = true
+			values.Del(REFRESH_PARAMNAME)
+			newUrl := Url.Scheme + "://" + Url.Host + Url.Path
+			if len(values) == 0 {
+				ret.SourceUrl = newUrl
+			} else {
+				newUrl += "?"
+				vs := make([]string, len(values))
+				i := 0
+				for k, v := range values {
+					vs[i] = k + "=" + strings.Join(v, "")
+				}
+				newUrl += strings.Join(vs, "&")
+				ret.SourceUrl = newUrl
+			}
+		}
 
-		sourceUrl := "http://" + sourceAddr + r.RequestURI
-		sortedUrl := utils.GetParamsSortedUrl(sourceUrl)
-
-		ret.SourceUrl = sourceUrl
-		ret.SortedUrl = sortedUrl
+		ret.SortedUrl = utils.GetParamsSortedUrl(ret.SourceUrl)
 		ret.ClientAddr = strings.Split(r.RemoteAddr, ":")
 	}
 
@@ -184,7 +211,7 @@ func RefreshLBRing() {
 			if _, err := http.Head(getAliveUrl(mn.Ip)); err == nil {
 				mapLBRingFailed[k].Remove(mn)
 				mapLBRing[k].Add(mn)
-				log.Warningf("%v comes alive\n", mn)
+				log.Warningf("%v comes alive", mn)
 			}
 		}
 	}

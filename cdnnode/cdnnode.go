@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"io/ioutil"
 	"mycdn/toolbox"
 	"net"
 	"net/http"
@@ -227,11 +228,19 @@ func main() {
 }
 
 func AddToCtrlNode(ctrlAddr string) bool {
-	if _, err := http.Get("http://" + env.CtrlAddr + "/addmn?ips=" + env.HostIP); nil != err {
+	if resp, err := http.Get("http://" + env.CtrlAddr + "/addmn?ip=" + env.HostIP); nil != err {
 		log.Error("Failed connect to center node: ", env.CtrlAddr, err)
 		return false
 	} else {
-		log.Info("Success registered to center node ", env.CtrlAddr)
+		b, err := ioutil.ReadAll(resp.Body)
+		if strings.Contains(string(b), "Yes") {
+			log.Info("Success registered to center node ", env.CtrlAddr, string(b))
+			return true
+		} else {
+			log.Error("Failed register to center node: ", env.CtrlAddr, err)
+			return false
+		}
+
 		return true
 	}
 }

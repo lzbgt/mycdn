@@ -33,6 +33,7 @@ type CDNHttpReqInfo struct {
 	SourceAddr string
 	SourceUrl  string
 	SortedUrl  string
+	Refresh    bool
 }
 
 // variables
