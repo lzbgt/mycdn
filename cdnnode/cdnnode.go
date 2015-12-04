@@ -132,7 +132,7 @@ func init() {
 		ticker := time.NewTicker(time.Second * 60 * 1)
 		go func() {
 			for _ = range ticker.C {
-				{
+				if AddToCtrlNode(env.CtrlAddr) {
 					return
 				}
 			}
