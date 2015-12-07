@@ -12,6 +12,9 @@ import (
 
 const REFRESH_PARAMNAME = "_sysrefresh"
 
+// used for short url
+var gShortId uint64 = 0
+
 func startWebSrv() {
 	http.HandleFunc("/", httphandler)
 	log.Println("INFO start web server on port ", env.WebPort)
@@ -58,6 +61,7 @@ func httphandler(w http.ResponseWriter, r *http.Request) {
 				redirectResources(w, r, &httpReqInfo)
 				return
 			}
+			//newId := atomic.AddUint64(&gShortId, 1)
 		}
 	}
 
